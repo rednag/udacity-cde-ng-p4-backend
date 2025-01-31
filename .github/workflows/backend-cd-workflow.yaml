@@ -1,0 +1,75 @@
+name: backend-cd-workflow
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
+
+      - run: |
+          cd starter/backend
+          python -m pip install --upgrade pip
+          python -m pip install pipenv
+          python -m pip install flake8
+
+      - run: cd starter/backend && pipenv run lint
+  
+  testing:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
+
+      - run: |
+          cd starter/backend
+          python -m pip install --upgrade pip
+          python -m pip install pipenv
+          python -m pip install flake8
+
+      - run: |
+          cd starter/backend
+          pipenv install pytest
+          pipenv run test
+
+  build:
+    needs: [linting, testing]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{secrets.AWS_SESSION_TOKEN}}
+          aws-region: us-east-1
+      - id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        env:
+          REPO_NAME: backend  
+        run: |
+          cd starter/backend
+          docker build --build-arg=REACT_APP_MOVIE_API_URL="http://a161002e464e04e39a7e327f3fc87350-796166600.us-east-1.elb.amazonaws.com" --tag 662318
+          docker push 099629925974.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:${GITHUB_SHA::7}
+
+      - run: aws eks --region us-east-1 update-kubeconfig --name cluster
+      - env:
+          IMAGE_TAG: latest
+          REPO_NAME: backend
+        run: |
+          cd starter/backend/k8s
+          aws eks --region us-east-1 update-kubeconfig --name cluster
+          kustomize edit set image 099629925974.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:${GITHUB_SHA::7}
+          kustomize build . | kubectl apply -f - --validate=false

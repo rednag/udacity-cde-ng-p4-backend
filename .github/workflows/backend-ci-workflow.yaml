@@ -18,12 +18,12 @@ jobs:
           python-version: "3.10"
 
       - run: |
-          cd starter/backend
+          
           python -m pip install --upgrade pip
           python -m pip install pipenv
           python -m pip install flake8
 
-      - run: cd starter/backend && pipenv run lint
+      - run: pipenv run lint
   
   testing:
     runs-on: ubuntu-latest
@@ -35,13 +35,11 @@ jobs:
           python-version: "3.10"
 
       - run: |
-          cd starter/backend
           python -m pip install --upgrade pip
           python -m pip install pipenv
           python -m pip install flake8
 
       - run: |
-          cd starter/backend
           pipenv install pytest
           pipenv run test
 
@@ -51,6 +49,5 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: |
-          cd starter/backend
           docker build --tag=mp-backend:latest .
         
